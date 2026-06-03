@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useCart } from '../../context/CartContext'
 
 export default function Navbar() {
-  const { user, logout } = useAuth()
+  const { user, logout, authLoading } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const { itemCount } = useCart()
@@ -44,7 +44,7 @@ export default function Navbar() {
           </Link>
 
           <div className="hidden md:flex items-center gap-3 text-sm">
-            {user ? (
+            {authLoading ? null : user ? (
               <>
                 <span className="text-farm-greenMuted">Hello, {user.firstName}</span>
                 <Link to="/orders" className="hover:text-farm-amber transition-colors">Orders</Link>
@@ -77,7 +77,7 @@ export default function Navbar() {
           flex flex-col gap-4 text-sm font-medium">
           <Link to="/listings" onClick={() => setMenuOpen(false)}
             className="hover:text-farm-amber transition-colors">Shop</Link>
-          {user ? (
+          {authLoading ? null : user ? (
             <>
               <span className="text-farm-greenMuted">Hello, {user.firstName}</span>
               <Link to="/orders" onClick={() => setMenuOpen(false)}

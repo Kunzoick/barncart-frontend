@@ -5,8 +5,8 @@ export default function RequireAdmin() {
   const { user, authLoading } = useAuth()
 
   if (authLoading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-gray-400 text-sm">Loading...</div>
+    <div className="min-h-screen flex items-center justify-center bg-farm-bg">
+      <div className="w-8 h-8 border-4 border-farm-green border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
