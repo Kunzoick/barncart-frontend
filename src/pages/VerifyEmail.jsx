@@ -57,6 +57,7 @@ export default function VerifyEmail() {
           <p className="text-sm text-gray-500">
             We sent a 6-digit code to{' '}
             <span className="font-medium text-farm-text">{email || 'your email'}</span>
+            . You can also skip this and log in directly as we are limited to some features with Resend.
           </p>
         </div>
 
@@ -144,6 +145,17 @@ export default function VerifyEmail() {
             Back to Login
           </Link>
         </p>
+         {/* Skip verification */}
+        <div className="mt-3 text-center">
+          <p className="text-xs text-gray-400 mb-1">Email verification is optional</p>
+          <Link
+            to="/login"
+            className="text-sm text-gray-500 hover:text-farm-green hover:underline"
+          >
+            Skip for now — go to Login
+          </Link>
+        </div>
+
       </div>
     </div>
   )
