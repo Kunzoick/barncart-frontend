@@ -10,7 +10,7 @@ export function useInventory(listingId, initialData) {
     if (!listingId) return
 
     const client = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+      webSocketFactory: () => new SockJS(`${import.meta.env.VITE_API_URL}/ws`),
       reconnectDelay: 5000,
       onConnect: () => {
         client.subscribe(
