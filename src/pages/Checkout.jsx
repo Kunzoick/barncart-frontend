@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
@@ -79,6 +79,7 @@ export default function Checkout() {
   const [resumeChecking, setResumeChecking] = useState(true)
   const [reservationMade, setReservationMade] = useState(false)
   const [idempotencyKey] = useState(() => generateUUID())
+  const hasInitialized = useRef(false)
 
   const [address, setAddress] = useState({
     addressLine1: '', addressLine2: '', city: '',
@@ -97,6 +98,8 @@ export default function Checkout() {
   useEffect(() => {
     if (authLoading) return
     if (!user) { setResumeChecking(false); return }
+    if (hasInitialized.current) { setResumeChecking(false); return }
+    hasInitialized.current = true
     getOrders()
       .then(async res => {
         const reserved = res.data.find(o => o.status === 'RESERVED')
