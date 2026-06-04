@@ -79,83 +79,83 @@ export default function Checkout() {
   const [resumeChecking, setResumeChecking] = useState(true)
   const [reservationMade, setReservationMade] = useState(false)
 
-
   const [address, setAddress] = useState({
     addressLine1: '', addressLine2: '', city: '',
     province: '', postalCode: '', country: 'CA', deliveryNotes: ''
   })
 
-  // Redirect if not logged in or cart empty
+  // Only redirect if not logged in — never redirect away from checkout
+  // once we are on the page, even if cart empties after reservation
   useEffect(() => {
-    if (!user) { navigate('/login'); return }
-    if (cart !== null && cart.items.length === 0) { navigate('/cart'); return }
-  }, [user, cart, reservationMade])
+    if (!authLoading && !user) {
+      navigate('/login')
+    }
+  }, [user, authLoading])
 
   // Resume checkout if user has an existing RESERVED order
-useEffect(() => {
-    if(authLoading) return
+  useEffect(() => {
+    if (authLoading) return
     if (!user) { setResumeChecking(false); return }
-  getOrders()
-    .then(async res => {
-        console.log('All orders:', res.data)
-      const reserved = res.data.find(o => o.status === 'RESERVED')
-      console.log('Reserved order:', reserved)
-      if (reserved && reserved.reservationExpiresAt) {
-        const expiry = new Date(reserved.reservationExpiresAt)
-        if (expiry > new Date()) {
-          try {
-            const secretRes = await getClientSecret(reserved.orderId)
-            setClientSecret(secretRes.data.clientSecret)
-            setReservationExpiresAt(reserved.reservationExpiresAt)
-            setStep(3)
-          } catch (err) {
-            console.error('getClientSecret failed:', err.response?.status, err.response?.data?.message)
+    getOrders()
+      .then(async res => {
+        const reserved = res.data.find(o => o.status === 'RESERVED')
+        if (reserved && reserved.reservationExpiresAt) {
+          const expiry = new Date(reserved.reservationExpiresAt)
+          if (expiry > new Date()) {
+            try {
+              const secretRes = await getClientSecret(reserved.orderId)
+              setClientSecret(secretRes.data.clientSecret)
+              setReservationExpiresAt(reserved.reservationExpiresAt)
+              setReservationMade(true)
+              setStep(3)
+            } catch (err) {
+              console.error('getClientSecret failed:', err.response?.status)
+            }
           }
         }
-      }
-    })
-    .catch(() => {
-        console.error('getOrders failed:', err.response?.status, err.response?.data)
-    })
-    .finally(() => setResumeChecking(false))
-}, [user, authLoading])
+      })
+      .catch((err) => {
+        console.error('getOrders failed:', err)
+      })
+      .finally(() => setResumeChecking(false))
+  }, [user, authLoading])
 
-  // Fetch slots for next 7 days
+  // Fetch slots for next 30 days
   useEffect(() => {
-  const now = new Date()
-  const currentHour = now.getHours()
-  
-  const from = new Date()
-  if (currentHour >= 17) {
-    from.setDate(from.getDate() + 1)
-  }
-  
-  const to = new Date()
-  to.setDate(to.getDate() + 7)
-  
-  const fmt = (d) => d.toISOString().split('T')[0]
-  const todayStr = fmt(now)
+    const now = new Date()
+    const currentHour = now.getHours()
 
-  getSlotsByRange(fmt(from), fmt(to))
-    .then(res => {
-      setSlots(res.data.filter(s => {
-        if (!s.available) return false
-        if (s.slotDate !== todayStr) return true
-        if (s.slotType === 'MORNING' && currentHour >= 10) return false
-        if (s.slotType === 'EVENING' && currentHour >= 17) return false
-        return true
-      }))
-    })
-    .catch(() => setSlots([]))
-    .finally(() => setSlotsLoading(false))
-}, [])
+    const from = new Date()
+    if (currentHour >= 17) {
+      from.setDate(from.getDate() + 1)
+    }
+
+    const to = new Date()
+    to.setDate(to.getDate() + 30)
+
+    const fmt = (d) => d.toISOString().split('T')[0]
+    const todayStr = fmt(now)
+
+    getSlotsByRange(fmt(from), fmt(to))
+      .then(res => {
+        setSlots(res.data.filter(s => {
+          if (!s.available) return false
+          if (s.slotDate !== todayStr) return true
+          if (s.slotType === 'MORNING' && currentHour >= 10) return false
+          if (s.slotType === 'EVENING' && currentHour >= 17) return false
+          return true
+        }))
+      })
+      .catch(() => setSlots([]))
+      .finally(() => setSlotsLoading(false))
+  }, [])
 
   const handleAddressChange = (e) => {
     setAddress({ ...address, [e.target.name]: e.target.value })
   }
 
   const handleCheckout = async () => {
-    if (reservationMade) return //prevent double submit
+    if (reservationMade) return
     setLoading(true)
     setPaymentError(null)
     try {
@@ -169,13 +169,12 @@ useEffect(() => {
       setReservationExpiresAt(res.data.reservationExpiresAt)
       setStep(3)
     } catch (err) {
-      const msg = err.response?.data?.message || ''
-      if (msg.toLowerCase().includes('already exists')){
-        //reservation already made - fetch existing and resume
-        try{
+      const msg = err.response?.data?.message || err.message || ''
+      if (msg.toLowerCase().includes('already exists')) {
+        try {
           const orderRes = await getOrders()
           const reserved = orderRes.data.find(o => o.status === 'RESERVED')
-          if(reserved){
+          if (reserved) {
             const secretRes = await getClientSecret(reserved.orderId)
             setClientSecret(secretRes.data.clientSecret)
             setReservationExpiresAt(reserved.reservationExpiresAt)
@@ -185,7 +184,7 @@ useEffect(() => {
           }
         } catch (_) {}
       }
-      setPaymentError (msg || 'Checkout failed. Please try again.')
+      setPaymentError(msg || 'Checkout failed. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -198,22 +197,22 @@ useEffect(() => {
     return acc
   }, {})
 
-  const subtotal = cart?.items.reduce((sum, item) => {
+  const subtotal = cart?.items?.reduce((sum, item) => {
     const price = item.quantity >= item.minBulkQuantity
       ? item.bulkPrice : item.retailPrice
     return sum + price * item.quantity
   }, 0) || 0
 
-  if (resumeChecking) {
+  if (authLoading || resumeChecking) {
     return (
-        <div className="max-w-2xl mx-auto px-4 py-8 text-center">
-            <div className="animate-pulse text-gray-400 text-sm">
-                Checking for existing reservations...
-            </div>
+      <div className="max-w-2xl mx-auto px-4 py-8 text-center">
+        <div className="animate-pulse text-gray-400 text-sm">
+          Checking for existing reservations...
         </div>
+      </div>
     )
   }
-  
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-farm-text mb-2">Checkout</h1>
@@ -441,6 +440,7 @@ useEffect(() => {
                 setStep(1)
                 setClientSecret(null)
                 setReservationExpiresAt(null)
+                setReservationMade(false)
               }}
             />
           </div>
