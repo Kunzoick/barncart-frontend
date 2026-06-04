@@ -158,18 +158,23 @@ export default function Checkout() {
     if (reservationMade) return
     setLoading(true)
     setPaymentError(null)
+    sessionStorage.setItem('checkout_debug', 'started')
     try {
+     sessionStorage.setItem('checkout_debug', 'calling_backend')
       const res = await checkout({
         idempotencyKey: generateUUID(),
         deliverySlotId: selectedSlot.id,
         ...address
       })
+      sessionStorage.setItem('checkout_debug', 'backend_success')
       setReservationMade(true)
       setClientSecret(res.data.clientSecret)
       setReservationExpiresAt(res.data.reservationExpiresAt)
+      sessionStorage.setItem('checkout_debug', 'setting_step_3')
       setStep(3)
     } catch (err) {
       const msg = err.response?.data?.message || err.message || ''
+      sessionStorage.setItem('checkout_debug', 'error:' + msg)
       if (msg.toLowerCase().includes('already exists')) {
         try {
           const orderRes = await getOrders()
@@ -238,6 +243,13 @@ export default function Checkout() {
           </div>
         ))}
       </div>
+
+       {/* DEBUG — remove after fix */}
+      {sessionStorage.getItem('checkout_debug') && (
+        <div className="mb-4 p-2 bg-yellow-100 text-xs text-yellow-900 rounded break-all">
+          Debug: {sessionStorage.getItem('checkout_debug')}
+        </div>
+      )}
 
       {/* Step 1 — Delivery Slot */}
       {step === 1 && (
