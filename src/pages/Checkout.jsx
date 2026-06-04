@@ -78,6 +78,7 @@ export default function Checkout() {
   const [slotsLoading, setSlotsLoading] = useState(true)
   const [resumeChecking, setResumeChecking] = useState(true)
   const [reservationMade, setReservationMade] = useState(false)
+  const [idempotencyKey] = useState(() => generateUUID())
 
   const [address, setAddress] = useState({
     addressLine1: '', addressLine2: '', city: '',
@@ -131,7 +132,7 @@ export default function Checkout() {
     }
 
     const to = new Date()
-    to.setDate(to.getDate() + 30)
+    to.setDate(to.getDate() + 14)
 
     const fmt = (d) => d.toISOString().split('T')[0]
     const todayStr = fmt(now)
@@ -162,7 +163,7 @@ export default function Checkout() {
     try {
      sessionStorage.setItem('checkout_debug', 'calling_backend')
       const res = await checkout({
-        idempotencyKey: generateUUID(),
+        idempotencyKey: idempotencyKey,
         deliverySlotId: selectedSlot.id,
         ...address
       })
