@@ -89,7 +89,7 @@ export default function Checkout() {
   useEffect(() => {
     if (!user) { navigate('/login'); return }
     if (cart !== null && cart.items.length === 0) { navigate('/cart'); return }
-  }, [user, cart])
+  }, [user, cart, reservationMade])
 
   // Resume checkout if user has an existing RESERVED order
 useEffect(() => {
