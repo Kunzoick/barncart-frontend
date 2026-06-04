@@ -80,6 +80,7 @@ export default function Checkout() {
   const [reservationMade, setReservationMade] = useState(false)
   const [idempotencyKey] = useState(() => generateUUID())
   const hasInitialized = useRef(false)
+  const submitting = useRef(false)
 
   const [address, setAddress] = useState({
     addressLine1: '', addressLine2: '', city: '',
@@ -159,7 +160,8 @@ export default function Checkout() {
   }
 
   const handleCheckout = async () => {
-    if (reservationMade) return
+    if (submitting.current) return
+    submitting.current = true
     setLoading(true)
     setPaymentError(null)
     sessionStorage.setItem('checkout_debug', 'started')
@@ -177,6 +179,7 @@ export default function Checkout() {
       sessionStorage.setItem('checkout_debug', 'setting_step_3')
       setStep(3)
     } catch (err) {
+      submitting.current = false
       const msg = err.response?.data?.message || err.message || ''
       sessionStorage.setItem('checkout_debug', 'error:' + msg)
       if (msg.toLowerCase().includes('already exists')) {
