@@ -77,6 +77,7 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false)
   const [slotsLoading, setSlotsLoading] = useState(true)
   const [resumeChecking, setResumeChecking] = useState(true)
+  const [reservationMade, setReservationMade] = useState(false)
 
 
   const [address, setAddress] = useState({
@@ -154,6 +155,7 @@ useEffect(() => {
   }
 
   const handleCheckout = async () => {
+    if (reservationMade) return //prevent double submit
     setLoading(true)
     setPaymentError(null)
     try {
@@ -162,11 +164,28 @@ useEffect(() => {
         deliverySlotId: selectedSlot.id,
         ...address
       })
+      setReservationMade(true)
       setClientSecret(res.data.clientSecret)
       setReservationExpiresAt(res.data.reservationExpiresAt)
       setStep(3)
     } catch (err) {
-      setPaymentError(err.response?.data?.message || 'Checkout failed. Please try again.')
+      const msg = err.response?.data?.message || ''
+      if (msg.toLowerCase().includes('already exists')){
+        //reservation already made - fetch existing and resume
+        try{
+          const orderRes = await getOrders()
+          const reserved = orderRes.data.find(o => o.status === 'RESERVED')
+          if(reserved){
+            const secretRes = await getClientSecret(reserved.orderId)
+            setClientSecret(secretRes.data.clientSecret)
+            setReservationExpiresAt(reserved.reservationExpiresAt)
+            setReservationMade(true)
+            setStep(3)
+            return
+          }
+        } catch (_) {}
+      }
+      setPaymentError (msg || 'Checkout failed. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -248,7 +267,7 @@ useEffect(() => {
               <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
                 {formatDate(date)}
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 {dateSlots.map(slot => (
                   <button
                     key={slot.id}
