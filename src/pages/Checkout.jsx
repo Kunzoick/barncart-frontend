@@ -193,6 +193,7 @@ export default function Checkout() {
       setReservationMade(true)
       setClientSecret(res.data.clientSecret)
       setReservationExpiresAt(res.data.reservationExpiresAt)
+      setResumeChecking(false)
       setStep(3)
     } catch (err) {
       submitting.current = false
@@ -207,6 +208,7 @@ export default function Checkout() {
             setClientSecret(secretRes.data.clientSecret)
             setReservationExpiresAt(reserved.reservationExpiresAt)
             setReservationMade(true)
+            setResumeChecking(false)
             setStep(3)
             return
           }
