@@ -97,6 +97,15 @@ export default function Checkout() {
     }
   }, [])
 
+  useEffect(() => {
+  sessionStorage.setItem('mount_count',
+    String(Number(sessionStorage.getItem('mount_count') || 0) + 1))
+  return () => {
+    sessionStorage.setItem('checkout_debug',
+      'UNMOUNTED_mounts:' + sessionStorage.getItem('mount_count'))
+  }
+}, [])
+
   // Only redirect if not logged in
   useEffect(() => {
     if (!authLoading && !user) {
@@ -272,7 +281,7 @@ export default function Checkout() {
       {/* DEBUG — remove after fix */}
       {sessionStorage.getItem('checkout_debug') && (
         <div className="mb-4 p-2 bg-yellow-100 text-xs text-yellow-900 rounded break-all">
-          Debug: {sessionStorage.getItem('checkout_debug')}
+          Debug: {sessionStorage.getItem('checkout_debug')} | mounts: {sessionStorage.getItem('mount_count')}
         </div>
       )}
 
