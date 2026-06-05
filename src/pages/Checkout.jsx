@@ -98,32 +98,39 @@ export default function Checkout() {
   // Resume checkout if user has an existing RESERVED order
   useEffect(() => {
     if (authLoading) return
-    if (!user) { setResumeChecking(false); return }
-    if (hasInitialized.current) { setResumeChecking(false); return }
-    hasInitialized.current = true
-    getOrders()
-      .then(async res => {
-        const reserved = res.data.find(o => o.status === 'RESERVED')
-        if (reserved && reserved.reservationExpiresAt) {
-          const expiry = new Date(reserved.reservationExpiresAt)
-          if (expiry > new Date()) {
-            try {
-              const secretRes = await getClientSecret(reserved.orderId)
-              setClientSecret(secretRes.data.clientSecret)
-              setReservationExpiresAt(reserved.reservationExpiresAt)
-              setReservationMade(true)
-              setStep(3)
-            } catch (err) {
-              console.error('getClientSecret failed:', err.response?.status)
-            }
+  if (!user) { setResumeChecking(false); return }
+  if (hasInitialized.current) { setResumeChecking(false); return }
+  hasInitialized.current = true
+  getOrders()
+    .then(async res => {
+      const reserved = res.data.find(o => o.status === 'RESERVED')
+      if (reserved && reserved.reservationExpiresAt) {
+        const expiry = new Date(reserved.reservationExpiresAt)
+        if (expiry > new Date()) {
+          try {
+            const secretRes = await getClientSecret(reserved.orderId)
+            setClientSecret(secretRes.data.clientSecret)
+            setReservationExpiresAt(reserved.reservationExpiresAt)
+            setReservationMade(true)
+            setStep(3)
+          } catch (err) {
+            const status = err.response?.status
+            const msg = err.response?.data?.message || err.message || 'unknown'
+            sessionStorage.setItem('checkout_debug', 
+              'getClientSecret_failed:' + status + ':' + msg)
           }
+        } else {
+          sessionStorage.setItem('checkout_debug', 'reservation_expired')
         }
-      })
-      .catch((err) => {
-        console.error('getOrders failed:', err)
-      })
-      .finally(() => setResumeChecking(false))
-  }, [user, authLoading])
+      } else {
+        sessionStorage.setItem('checkout_debug', 'no_reserved_order_found')
+      }
+    })
+    .catch((err) => {
+      sessionStorage.setItem('checkout_debug', 'getOrders_failed:' + err.message)
+    })
+    .finally(() => setResumeChecking(false))
+}, [user, authLoading])
 
   // Fetch slots for next 30 days
   useEffect(() => {
@@ -172,7 +179,7 @@ export default function Checkout() {
         deliverySlotId: selectedSlot.id,
         ...address
       })
-      sessionStorage.setItem('checkout_debug', 'backend_success')
+      sessionStorage.setItem('checkout_debug', 'backend_success_cs:' + (res.data.clientSecret ? 'present' : 'missing'))
       setReservationMade(true)
       setClientSecret(res.data.clientSecret)
       setReservationExpiresAt(res.data.reservationExpiresAt)
