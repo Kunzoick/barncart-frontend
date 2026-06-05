@@ -241,6 +241,7 @@ export default function Checkout() {
       ? item.bulkPrice : item.retailPrice
     return sum + price * item.quantity
   }, 0) || 0
+  sessionStorage.setItem('last_render_step', String(step))
 
   if (authLoading || resumeChecking) {
     return (
@@ -281,7 +282,9 @@ export default function Checkout() {
       {/* DEBUG — remove after fix */}
       {sessionStorage.getItem('checkout_debug') && (
         <div className="mb-4 p-2 bg-yellow-100 text-xs text-yellow-900 rounded break-all">
-          Debug: {sessionStorage.getItem('checkout_debug')} | mounts: {sessionStorage.getItem('mount_count')}
+          Debug: {sessionStorage.getItem('checkout_debug')} | mounts: {sessionStorage.getItem('mount_count')} | last_step: {sessionStorage.getItem('last_render_step')}
+  </div>
+)}
         </div>
       )}
 
