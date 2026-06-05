@@ -10,8 +10,6 @@ import { Calendar, Clock, MapPin } from 'lucide-react'
 import ReservationTimer from '../components/checkout/ReservationTimer'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
-
-// Outside component — survives StrictMode double-mount
 let checkoutInitialized = false
 
 function generateUUID() {
@@ -40,9 +38,7 @@ function StripePaymentForm({ onError }) {
     try {
       const { error } = await stripe.confirmPayment({
         elements,
-        confirmParams: {
-          return_url: `${window.location.origin}/order-confirmation`
-        }
+        confirmParams: { return_url: `${window.location.origin}/order-confirmation` }
       })
       if (error) onError(error.message)
     } finally {
@@ -53,13 +49,10 @@ function StripePaymentForm({ onError }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <PaymentElement />
-      <button
-        type="submit"
-        disabled={!stripe || loading}
+      <button type="submit" disabled={!stripe || loading}
         className="w-full bg-farm-green text-white py-3 rounded-lg font-medium
           hover:bg-farm-greenLight transition-colors disabled:opacity-60
-          disabled:cursor-not-allowed"
-      >
+          disabled:cursor-not-allowed">
         {loading ? 'Processing...' : 'Confirm Payment'}
       </button>
     </form>
@@ -89,31 +82,24 @@ export default function Checkout() {
     province: '', postalCode: '', country: 'CA', deliveryNotes: ''
   })
 
-  // Reset module-level flag on mount, clean up on unmount
   useEffect(() => {
     checkoutInitialized = false
+    return () => { checkoutInitialized = false }
+  }, [])
+
+  useEffect(() => {
+    sessionStorage.setItem('mount_count',
+      String(Number(sessionStorage.getItem('mount_count') || 0) + 1))
     return () => {
-      checkoutInitialized = false
+      sessionStorage.setItem('checkout_debug',
+        'UNMOUNTED_mounts:' + sessionStorage.getItem('mount_count'))
     }
   }, [])
 
   useEffect(() => {
-  sessionStorage.setItem('mount_count',
-    String(Number(sessionStorage.getItem('mount_count') || 0) + 1))
-  return () => {
-    sessionStorage.setItem('checkout_debug',
-      'UNMOUNTED_mounts:' + sessionStorage.getItem('mount_count'))
-  }
-}, [])
-
-  // Only redirect if not logged in
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/login')
-    }
+    if (!authLoading && !user) navigate('/login')
   }, [user, authLoading])
 
-  // Resume checkout if user has an existing RESERVED order — runs once only
   useEffect(() => {
     if (authLoading) return
     if (!user) { setResumeChecking(false); return }
@@ -131,6 +117,7 @@ export default function Checkout() {
               setClientSecret(secretRes.data.clientSecret)
               setReservationExpiresAt(reserved.reservationExpiresAt)
               setReservationMade(true)
+              setResumeChecking(false)
               setStep(3)
             } catch (err) {
               const status = err.response?.status
@@ -151,19 +138,13 @@ export default function Checkout() {
       .finally(() => setResumeChecking(false))
   }, [user, authLoading])
 
-  // Fetch slots for next 14 days
   useEffect(() => {
     const now = new Date()
     const currentHour = now.getHours()
-
     const from = new Date()
-    if (currentHour >= 17) {
-      from.setDate(from.getDate() + 1)
-    }
-
+    if (currentHour >= 17) from.setDate(from.getDate() + 1)
     const to = new Date()
     to.setDate(to.getDate() + 14)
-
     const fmt = (d) => d.toISOString().split('T')[0]
     const todayStr = fmt(now)
 
@@ -241,6 +222,7 @@ export default function Checkout() {
       ? item.bulkPrice : item.retailPrice
     return sum + price * item.quantity
   }, 0) || 0
+
   sessionStorage.setItem('last_render_step', String(step))
 
   if (authLoading || resumeChecking) {
@@ -257,7 +239,6 @@ export default function Checkout() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-farm-text mb-2">Checkout</h1>
 
-      {/* Step indicator */}
       <div className="flex items-center gap-2 mb-8">
         {['Delivery Slot', 'Address', 'Payment'].map((label, i) => (
           <div key={i} className="flex items-center gap-2">
@@ -283,12 +264,9 @@ export default function Checkout() {
       {sessionStorage.getItem('checkout_debug') && (
         <div className="mb-4 p-2 bg-yellow-100 text-xs text-yellow-900 rounded break-all">
           Debug: {sessionStorage.getItem('checkout_debug')} | mounts: {sessionStorage.getItem('mount_count')} | last_step: {sessionStorage.getItem('last_render_step')}
-  </div>
-)}
         </div>
       )}
 
-      {/* Step 1 — Delivery Slot */}
       {step === 1 && (
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -317,16 +295,13 @@ export default function Checkout() {
               </p>
               <div className="flex flex-col sm:flex-row gap-2">
                 {dateSlots.map(slot => (
-                  <button
-                    key={slot.id}
-                    onClick={() => setSelectedSlot(slot)}
+                  <button key={slot.id} onClick={() => setSelectedSlot(slot)}
                     className={`flex-1 flex items-center gap-2 px-4 py-3
                       rounded-lg border text-sm font-medium transition-colors ${
                       selectedSlot?.id === slot.id
                         ? 'border-farm-green bg-farm-greenMuted text-farm-green'
                         : 'border-gray-200 text-gray-600 hover:border-farm-green'
-                    }`}
-                  >
+                    }`}>
                     <Clock className="w-4 h-4" />
                     {slot.slotType === 'MORNING' ? 'Morning' : 'Evening'}
                     <span className="text-xs text-gray-400 ml-auto">
@@ -338,19 +313,15 @@ export default function Checkout() {
             </div>
           ))}
 
-          <button
-            onClick={() => setStep(2)}
-            disabled={!selectedSlot}
+          <button onClick={() => setStep(2)} disabled={!selectedSlot}
             className="w-full bg-farm-green text-white py-3 rounded-lg font-medium
               hover:bg-farm-greenLight transition-colors disabled:opacity-60
-              disabled:cursor-not-allowed mt-4"
-          >
+              disabled:cursor-not-allowed mt-4">
             Continue to Address
           </button>
         </div>
       )}
 
-      {/* Step 2 — Address */}
       {step === 2 && (
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -373,8 +344,8 @@ export default function Checkout() {
               <input type="text" name="addressLine1" value={address.addressLine1}
                 onChange={handleAddressChange} required placeholder="123 Main Street"
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm
-                  focus:outline-none focus:ring-2 focus:ring-farm-green focus:border-transparent
-                  placeholder:text-gray-400" />
+                  focus:outline-none focus:ring-2 focus:ring-farm-green
+                  focus:border-transparent placeholder:text-gray-400" />
             </div>
 
             <div>
@@ -385,8 +356,8 @@ export default function Checkout() {
               <input type="text" name="addressLine2" value={address.addressLine2}
                 onChange={handleAddressChange} placeholder="Apt 4B"
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm
-                  focus:outline-none focus:ring-2 focus:ring-farm-green focus:border-transparent
-                  placeholder:text-gray-400" />
+                  focus:outline-none focus:ring-2 focus:ring-farm-green
+                  focus:border-transparent placeholder:text-gray-400" />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -395,16 +366,16 @@ export default function Checkout() {
                 <input type="text" name="city" value={address.city}
                   onChange={handleAddressChange} required placeholder="Toronto"
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm
-                    focus:outline-none focus:ring-2 focus:ring-farm-green focus:border-transparent
-                    placeholder:text-gray-400" />
+                    focus:outline-none focus:ring-2 focus:ring-farm-green
+                    focus:border-transparent placeholder:text-gray-400" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-farm-text mb-1">Province</label>
                 <input type="text" name="province" value={address.province}
                   onChange={handleAddressChange} required placeholder="ON"
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm
-                    focus:outline-none focus:ring-2 focus:ring-farm-green focus:border-transparent
-                    placeholder:text-gray-400" />
+                    focus:outline-none focus:ring-2 focus:ring-farm-green
+                    focus:border-transparent placeholder:text-gray-400" />
               </div>
             </div>
 
@@ -414,15 +385,16 @@ export default function Checkout() {
                 <input type="text" name="postalCode" value={address.postalCode}
                   onChange={handleAddressChange} required placeholder="M5V 3A8"
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm
-                    focus:outline-none focus:ring-2 focus:ring-farm-green focus:border-transparent
-                    placeholder:text-gray-400" />
+                    focus:outline-none focus:ring-2 focus:ring-farm-green
+                    focus:border-transparent placeholder:text-gray-400" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-farm-text mb-1">Country</label>
                 <input type="text" name="country" value={address.country}
                   onChange={handleAddressChange}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm
-                    focus:outline-none focus:ring-2 focus:ring-farm-green focus:border-transparent" />
+                    focus:outline-none focus:ring-2 focus:ring-farm-green
+                    focus:border-transparent" />
               </div>
             </div>
 
@@ -435,8 +407,8 @@ export default function Checkout() {
                 onChange={handleAddressChange}
                 placeholder="Leave at door, call on arrival..." rows={2}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm
-                  focus:outline-none focus:ring-2 focus:ring-farm-green focus:border-transparent
-                  placeholder:text-gray-400 resize-none" />
+                  focus:outline-none focus:ring-2 focus:ring-farm-green
+                  focus:border-transparent placeholder:text-gray-400 resize-none" />
             </div>
           </div>
 
@@ -454,7 +426,8 @@ export default function Checkout() {
           <div className="flex gap-3 mt-4">
             <button onClick={() => setStep(1)}
               className="flex-1 border border-gray-200 text-gray-600 py-3 rounded-lg
-                font-medium hover:border-farm-green hover:text-farm-green transition-colors text-sm">
+                font-medium hover:border-farm-green hover:text-farm-green
+                transition-colors text-sm">
               Back
             </button>
             <button onClick={handleCheckout}
@@ -469,7 +442,6 @@ export default function Checkout() {
         </div>
       )}
 
-      {/* Step 3 — Payment */}
       {step === 3 && clientSecret && (
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <h2 className="font-semibold text-farm-text mb-4">Payment</h2>
@@ -496,16 +468,10 @@ export default function Checkout() {
             />
           </div>
 
-          <Elements
-            stripe={stripePromise}
-            options={{
-              clientSecret,
-              appearance: {
-                theme: 'stripe',
-                variables: { colorPrimary: '#2D6A4F' }
-              }
-            }}
-          >
+          <Elements stripe={stripePromise} options={{
+            clientSecret,
+            appearance: { theme: 'stripe', variables: { colorPrimary: '#2D6A4F' } }
+          }}>
             <StripePaymentForm onError={(msg) => setPaymentError(msg)} />
           </Elements>
         </div>
