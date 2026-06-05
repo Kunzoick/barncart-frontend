@@ -11,6 +11,9 @@ import ReservationTimer from '../components/checkout/ReservationTimer'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
+// Outside component — survives StrictMode double-mount
+let checkoutInitialized = false
+
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0
@@ -79,7 +82,6 @@ export default function Checkout() {
   const [resumeChecking, setResumeChecking] = useState(true)
   const [reservationMade, setReservationMade] = useState(false)
   const [idempotencyKey] = useState(() => generateUUID())
-  const hasInitialized = useRef(false)
   const submitting = useRef(false)
 
   const [address, setAddress] = useState({
@@ -87,52 +89,60 @@ export default function Checkout() {
     province: '', postalCode: '', country: 'CA', deliveryNotes: ''
   })
 
-  // Only redirect if not logged in — never redirect away from checkout
-  // once we are on the page, even if cart empties after reservation
+  // Reset module-level flag on mount, clean up on unmount
+  useEffect(() => {
+    checkoutInitialized = false
+    return () => {
+      checkoutInitialized = false
+    }
+  }, [])
+
+  // Only redirect if not logged in
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/login')
     }
   }, [user, authLoading])
 
-  // Resume checkout if user has an existing RESERVED order
+  // Resume checkout if user has an existing RESERVED order — runs once only
   useEffect(() => {
     if (authLoading) return
-  if (!user) { setResumeChecking(false); return }
-  if (hasInitialized.current) { setResumeChecking(false); return }
-  hasInitialized.current = true
-  getOrders()
-    .then(async res => {
-      const reserved = res.data.find(o => o.status === 'RESERVED')
-      if (reserved && reserved.reservationExpiresAt) {
-        const expiry = new Date(reserved.reservationExpiresAt)
-        if (expiry > new Date()) {
-          try {
-            const secretRes = await getClientSecret(reserved.orderId)
-            setClientSecret(secretRes.data.clientSecret)
-            setReservationExpiresAt(reserved.reservationExpiresAt)
-            setReservationMade(true)
-            setStep(3)
-          } catch (err) {
-            const status = err.response?.status
-            const msg = err.response?.data?.message || err.message || 'unknown'
-            sessionStorage.setItem('checkout_debug', 
-              'getClientSecret_failed:' + status + ':' + msg)
+    if (!user) { setResumeChecking(false); return }
+    if (checkoutInitialized) { setResumeChecking(false); return }
+    checkoutInitialized = true
+
+    getOrders()
+      .then(async res => {
+        const reserved = res.data.find(o => o.status === 'RESERVED')
+        if (reserved && reserved.reservationExpiresAt) {
+          const expiry = new Date(reserved.reservationExpiresAt)
+          if (expiry > new Date()) {
+            try {
+              const secretRes = await getClientSecret(reserved.orderId)
+              setClientSecret(secretRes.data.clientSecret)
+              setReservationExpiresAt(reserved.reservationExpiresAt)
+              setReservationMade(true)
+              setStep(3)
+            } catch (err) {
+              const status = err.response?.status
+              const msg = err.response?.data?.message || err.message || 'unknown'
+              sessionStorage.setItem('checkout_debug',
+                'getClientSecret_failed:' + status + ':' + msg)
+            }
+          } else {
+            sessionStorage.setItem('checkout_debug', 'reservation_expired')
           }
         } else {
-          sessionStorage.setItem('checkout_debug', 'reservation_expired')
+          sessionStorage.setItem('checkout_debug', 'no_reserved_order_found')
         }
-      } else {
-        sessionStorage.setItem('checkout_debug', 'no_reserved_order_found')
-      }
-    })
-    .catch((err) => {
-      sessionStorage.setItem('checkout_debug', 'getOrders_failed:' + err.message)
-    })
-    .finally(() => setResumeChecking(false))
-}, [user, authLoading])
+      })
+      .catch((err) => {
+        sessionStorage.setItem('checkout_debug', 'getOrders_failed:' + err.message)
+      })
+      .finally(() => setResumeChecking(false))
+  }, [user, authLoading])
 
-  // Fetch slots for next 30 days
+  // Fetch slots for next 14 days
   useEffect(() => {
     const now = new Date()
     const currentHour = now.getHours()
@@ -171,19 +181,18 @@ export default function Checkout() {
     submitting.current = true
     setLoading(true)
     setPaymentError(null)
-    sessionStorage.setItem('checkout_debug', 'started')
+    sessionStorage.setItem('checkout_debug', 'calling_backend')
     try {
-     sessionStorage.setItem('checkout_debug', 'calling_backend')
       const res = await checkout({
         idempotencyKey: idempotencyKey,
         deliverySlotId: selectedSlot.id,
         ...address
       })
-      sessionStorage.setItem('checkout_debug', 'backend_success_cs:' + (res.data.clientSecret ? 'present' : 'missing'))
+      sessionStorage.setItem('checkout_debug',
+        'backend_success_cs:' + (res.data.clientSecret ? 'present' : 'missing'))
       setReservationMade(true)
       setClientSecret(res.data.clientSecret)
       setReservationExpiresAt(res.data.reservationExpiresAt)
-      sessionStorage.setItem('checkout_debug', 'setting_step_3')
       setStep(3)
     } catch (err) {
       submitting.current = false
@@ -258,7 +267,7 @@ export default function Checkout() {
         ))}
       </div>
 
-       {/* DEBUG — remove after fix */}
+      {/* DEBUG — remove after fix */}
       {sessionStorage.getItem('checkout_debug') && (
         <div className="mb-4 p-2 bg-yellow-100 text-xs text-yellow-900 rounded break-all">
           Debug: {sessionStorage.getItem('checkout_debug')}
@@ -467,6 +476,8 @@ export default function Checkout() {
                 setClientSecret(null)
                 setReservationExpiresAt(null)
                 setReservationMade(false)
+                submitting.current = false
+                checkoutInitialized = false
               }}
             />
           </div>
