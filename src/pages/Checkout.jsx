@@ -79,7 +79,9 @@ export default function Checkout() {
   const [reservationMade, setReservationMade] = useState(false)
   const [idempotencyKey] = useState(() => generateUUID())
   const [stripeError, setStripeError] = useState(null)
-
+  const [debugLog, setDebugLog] = useState([])
+  
+  const log = (msg) => setDebugLog(prev => [...prev, `${new Date().toLocaleTimeString()} — ${msg}`])
   const submitting = useRef(false)
   const resumeHasRun = useRef(false)
 
@@ -89,62 +91,43 @@ export default function Checkout() {
   })
 
   // Redirect if not logged in
-  useEffect(() => {
-    if (!authLoading && !user) navigate('/login')
-  }, [user, authLoading])
+useEffect(() => {
+  if (authLoading) { log('auth still loading...'); return }
+  if (!user) { log('no user after auth'); setResumeChecking(false); return }
+  if (submitting.current) { log('submitting in progress, skipping resume'); setResumeChecking(false); return }
+  if (resumeHasRun.current) { log('resume already ran, skipping'); setResumeChecking(false); return }
 
-  // Resume existing reservation if one exists
-  useEffect(() => {
-    // Auth still resolving — wait, effect will re-run when it flips
-    if (authLoading) return
+  resumeHasRun.current = true
+  log('calling getOrders...')
 
-    // Auth resolved but no user — stop
-    if (!user) {
-      setResumeChecking(false)
-      return
-    }
-
-    // Checkout already in progress — don't interfere
-    if (submitting.current) {
-      setResumeChecking(false)
-      return
-    }
-
-    // Already ran — don't run again
-    if (resumeHasRun.current) {
-      setResumeChecking(false)
-      return
-    }
-
-    // Set the flag ONLY here — after all guards pass, before async work starts
-    resumeHasRun.current = true
-
-    getOrders()
-      .then(async res => {
-        // Checkout completed while getOrders was in-flight — don't overwrite
-        if (submitting.current) return
-
-        const reserved = res.data.find(o => o.status === 'RESERVED')
-        if (reserved && reserved.reservationExpiresAt) {
-          const expiry = new Date(reserved.reservationExpiresAt)
-          if (expiry > new Date()) {
-            try {
-              const secretRes = await getClientSecret(reserved.orderId)
-              setClientSecret(secretRes.data.clientSecret)
-              setReservationExpiresAt(reserved.reservationExpiresAt)
-              setReservationMade(true)
-              setStep(3)
-            } catch (_) {
-              // client secret fetch failed — user starts fresh from step 1
-            }
+  getOrders()
+    .then(async res => {
+      if (submitting.current) { log('submitting started mid-fetch, bailing'); return }
+      const reserved = res.data.find(o => o.status === 'RESERVED')
+      log('reserved order found: ' + (reserved ? reserved.orderId : 'none'))
+      if (reserved && reserved.reservationExpiresAt) {
+        const expiry = new Date(reserved.reservationExpiresAt)
+        const expired = expiry <= new Date()
+        log('expiry: ' + reserved.reservationExpiresAt + ' | expired: ' + expired)
+        if (!expired) {
+          try {
+            log('calling getClientSecret...')
+            const secretRes = await getClientSecret(reserved.orderId)
+            log('clientSecret received: ' + (secretRes.data.clientSecret ? 'YES' : 'NO'))
+            setClientSecret(secretRes.data.clientSecret)
+            setReservationExpiresAt(reserved.reservationExpiresAt)
+            setReservationMade(true)
+            setStep(3)
+            log('step set to 3')
+          } catch (err) {
+            log('getClientSecret failed: ' + (err.response?.status || err.message))
           }
         }
-      })
-      .catch(() => {
-        // getOrders failed — user starts fresh from step 1
-      })
-      .finally(() => setResumeChecking(false))
-  }, [user, authLoading])
+      }
+    })
+    .catch(err => log('getOrders failed: ' + (err.response?.status || err.message)))
+    .finally(() => { log('resumeChecking done'); setResumeChecking(false) })
+}, [user, authLoading])
 
   // Load delivery slots
   useEffect(() => {
@@ -175,43 +158,49 @@ export default function Checkout() {
     setAddress({ ...address, [e.target.name]: e.target.value })
   }
 
-  const handleCheckout = async () => {
-    if (submitting.current) return
-    submitting.current = true
-    setLoading(true)
-    setPaymentError(null)
-    try {
-      const res = await checkout({
-        idempotencyKey,
-        deliverySlotId: selectedSlot.id,
-        ...address
-      })
-      setReservationMade(true)
-      setClientSecret(res.data.clientSecret)
-      setReservationExpiresAt(res.data.reservationExpiresAt)
-      setStep(3)
-    } catch (err) {
-      submitting.current = false
-      const msg = err.response?.data?.message || err.message || ''
-      if (msg.toLowerCase().includes('already exists')) {
-        try {
-          const orderRes = await getOrders()
-          const reserved = orderRes.data.find(o => o.status === 'RESERVED')
-          if (reserved) {
-            const secretRes = await getClientSecret(reserved.orderId)
-            setClientSecret(secretRes.data.clientSecret)
-            setReservationExpiresAt(reserved.reservationExpiresAt)
-            setReservationMade(true)
-            setStep(3)
-            return
-          }
-        } catch (_) {}
-      }
-      setPaymentError(msg || 'Checkout failed. Please try again.')
-    } finally {
-      setLoading(false)
+  // Inside handleCheckout
+const handleCheckout = async () => {
+  if (submitting.current) { log('already submitting, blocked'); return }
+  submitting.current = true
+  setLoading(true)
+  setPaymentError(null)
+  log('handleCheckout started')
+  try {
+    const res = await checkout({
+      idempotencyKey,
+      deliverySlotId: selectedSlot.id,
+      ...address
+    })
+    log('checkout success, clientSecret: ' + (res.data.clientSecret ? 'YES' : 'NO'))
+    setReservationMade(true)
+    setClientSecret(res.data.clientSecret)
+    setReservationExpiresAt(res.data.reservationExpiresAt)
+    setStep(3)
+    log('step set to 3 from handleCheckout')
+  } catch (err) {
+    submitting.current = false
+    const msg = err.response?.data?.message || err.message || ''
+    log('checkout error: ' + msg)
+    if (msg.toLowerCase().includes('already exists')) {
+      try {
+        const orderRes = await getOrders()
+        const reserved = orderRes.data.find(o => o.status === 'RESERVED')
+        if (reserved) {
+          const secretRes = await getClientSecret(reserved.orderId)
+          setClientSecret(secretRes.data.clientSecret)
+          setReservationExpiresAt(reserved.reservationExpiresAt)
+          setReservationMade(true)
+          setStep(3)
+          log('step set to 3 from error recovery')
+          return
+        }
+      } catch (_) { log('error recovery also failed') }
     }
+    setPaymentError(msg || 'Checkout failed. Please try again.')
+  } finally {
+    setLoading(false)
   }
+}
 
   const slotsByDate = slots.reduce((acc, slot) => {
     const date = slot.slotDate
@@ -260,6 +249,14 @@ export default function Checkout() {
           </div>
         ))}
       </div>
+
+      {debugLog.length > 0 && (
+  <div className="mb-4 p-3 bg-gray-900 rounded-lg overflow-auto max-h-48">
+    {debugLog.map((entry, i) => (
+      <p key={i} className="text-xs text-green-400 font-mono">{entry}</p>
+    ))}
+  </div>
+)}
 
       {step === 1 && (
         <div className="bg-white rounded-xl border border-gray-100 p-6">
