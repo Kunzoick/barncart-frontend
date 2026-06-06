@@ -10,10 +10,6 @@ import { Calendar, Clock, MapPin } from 'lucide-react'
 import ReservationTimer from '../components/checkout/ReservationTimer'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
-.catch(err => {
-  console.error('Stripe failed to load:', err)
-  return null
-})
 
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -78,10 +74,7 @@ export default function Checkout() {
   const [resumeChecking, setResumeChecking] = useState(true)
   const [reservationMade, setReservationMade] = useState(false)
   const [idempotencyKey] = useState(() => generateUUID())
-  const [stripeError, setStripeError] = useState(null)
-  const [debugLog, setDebugLog] = useState([])
-  
-  const log = (msg) => setDebugLog(prev => [...prev, `${new Date().toLocaleTimeString()} — ${msg}`])
+
   const submitting = useRef(false)
   const resumeHasRun = useRef(false)
 
@@ -90,46 +83,57 @@ export default function Checkout() {
     province: '', postalCode: '', country: 'CA', deliveryNotes: ''
   })
 
-  // Redirect if not logged in
-useEffect(() => {
-  if (authLoading) { log('auth still loading...'); return }
-  if (!user) { log('no user after auth'); setResumeChecking(false); return }
-  if (submitting.current) { log('submitting in progress, skipping resume'); setResumeChecking(false); return }
-  if (resumeHasRun.current) { log('resume already ran, skipping'); setResumeChecking(false); return }
+  useEffect(() => {
+    if (!authLoading && !user) navigate('/login')
+  }, [user, authLoading])
 
-  resumeHasRun.current = true
-  log('calling getOrders...')
+  useEffect(() => {
+    if (authLoading) return
 
-  getOrders()
-    .then(async res => {
-      if (submitting.current) { log('submitting started mid-fetch, bailing'); return }
-      const reserved = res.data.find(o => o.status === 'RESERVED')
-      log('reserved order found: ' + (reserved ? reserved.orderId : 'none'))
-      if (reserved && reserved.reservationExpiresAt) {
-        const expiry = new Date(reserved.reservationExpiresAt)
-        const expired = expiry <= new Date()
-        log('expiry: ' + reserved.reservationExpiresAt + ' | expired: ' + expired)
-        if (!expired) {
-          try {
-            log('calling getClientSecret...')
-            const secretRes = await getClientSecret(reserved.orderId)
-            log('clientSecret received: ' + (secretRes.data.clientSecret ? 'YES' : 'NO'))
-            setClientSecret(secretRes.data.clientSecret)
-            setReservationExpiresAt(reserved.reservationExpiresAt)
-            setReservationMade(true)
-            setStep(3)
-            log('step set to 3')
-          } catch (err) {
-            log('getClientSecret failed: ' + (err.response?.status || err.message))
+    if (!user) {
+      setResumeChecking(false)
+      return
+    }
+
+    if (submitting.current) {
+      setResumeChecking(false)
+      return
+    }
+
+    if (resumeHasRun.current) {
+      setResumeChecking(false)
+      return
+    }
+
+    resumeHasRun.current = true
+
+    getOrders()
+      .then(async res => {
+        if (submitting.current) return
+
+        const reserved = res.data.find(o => o.status === 'RESERVED')
+        if (reserved && reserved.reservationExpiresAt) {
+          const raw = reserved.reservationExpiresAt
+          const expiry = new Date(raw.endsWith('Z') ? raw : raw + 'Z')
+          if (expiry > new Date()) {
+            try {
+              const secretRes = await getClientSecret(reserved.orderId)
+              setClientSecret(secretRes.data.clientSecret)
+              setReservationExpiresAt(reserved.reservationExpiresAt)
+              setReservationMade(true)
+              setStep(3)
+            } catch (_) {
+              // client secret fetch failed — user starts fresh from step 1
+            }
           }
         }
-      }
-    })
-    .catch(err => log('getOrders failed: ' + (err.response?.status || err.message)))
-    .finally(() => { log('resumeChecking done'); setResumeChecking(false) })
-}, [user, authLoading])
+      })
+      .catch(() => {
+        // getOrders failed — user starts fresh from step 1
+      })
+      .finally(() => setResumeChecking(false))
+  }, [user, authLoading])
 
-  // Load delivery slots
   useEffect(() => {
     const now = new Date()
     const currentHour = now.getHours()
@@ -158,49 +162,43 @@ useEffect(() => {
     setAddress({ ...address, [e.target.name]: e.target.value })
   }
 
-  // Inside handleCheckout
-const handleCheckout = async () => {
-  if (submitting.current) { log('already submitting, blocked'); return }
-  submitting.current = true
-  setLoading(true)
-  setPaymentError(null)
-  log('handleCheckout started')
-  try {
-    const res = await checkout({
-      idempotencyKey,
-      deliverySlotId: selectedSlot.id,
-      ...address
-    })
-    log('checkout success, clientSecret: ' + (res.data.clientSecret ? 'YES' : 'NO'))
-    setReservationMade(true)
-    setClientSecret(res.data.clientSecret)
-    setReservationExpiresAt(res.data.reservationExpiresAt)
-    setStep(3)
-    log('step set to 3 from handleCheckout')
-  } catch (err) {
-    submitting.current = false
-    const msg = err.response?.data?.message || err.message || ''
-    log('checkout error: ' + msg)
-    if (msg.toLowerCase().includes('already exists')) {
-      try {
-        const orderRes = await getOrders()
-        const reserved = orderRes.data.find(o => o.status === 'RESERVED')
-        if (reserved) {
-          const secretRes = await getClientSecret(reserved.orderId)
-          setClientSecret(secretRes.data.clientSecret)
-          setReservationExpiresAt(reserved.reservationExpiresAt)
-          setReservationMade(true)
-          setStep(3)
-          log('step set to 3 from error recovery')
-          return
-        }
-      } catch (_) { log('error recovery also failed') }
+  const handleCheckout = async () => {
+    if (submitting.current) return
+    submitting.current = true
+    setLoading(true)
+    setPaymentError(null)
+    try {
+      const res = await checkout({
+        idempotencyKey,
+        deliverySlotId: selectedSlot.id,
+        ...address
+      })
+      setReservationMade(true)
+      setClientSecret(res.data.clientSecret)
+      setReservationExpiresAt(res.data.reservationExpiresAt)
+      setStep(3)
+    } catch (err) {
+      submitting.current = false
+      const msg = err.response?.data?.message || err.message || ''
+      if (msg.toLowerCase().includes('already exists')) {
+        try {
+          const orderRes = await getOrders()
+          const reserved = orderRes.data.find(o => o.status === 'RESERVED')
+          if (reserved) {
+            const secretRes = await getClientSecret(reserved.orderId)
+            setClientSecret(secretRes.data.clientSecret)
+            setReservationExpiresAt(reserved.reservationExpiresAt)
+            setReservationMade(true)
+            setStep(3)
+            return
+          }
+        } catch (_) {}
+      }
+      setPaymentError(msg || 'Checkout failed. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    setPaymentError(msg || 'Checkout failed. Please try again.')
-  } finally {
-    setLoading(false)
   }
-}
 
   const slotsByDate = slots.reduce((acc, slot) => {
     const date = slot.slotDate
@@ -249,14 +247,6 @@ const handleCheckout = async () => {
           </div>
         ))}
       </div>
-
-      {debugLog.length > 0 && (
-  <div className="mb-4 p-3 bg-gray-900 rounded-lg overflow-auto max-h-48">
-    {debugLog.map((entry, i) => (
-      <p key={i} className="text-xs text-green-400 font-mono">{entry}</p>
-    ))}
-  </div>
-)}
 
       {step === 1 && (
         <div className="bg-white rounded-xl border border-gray-100 p-6">
@@ -432,18 +422,6 @@ const handleCheckout = async () => {
           </div>
         </div>
       )}
-
-      {step === 3 && !clientSecret && (
-  <div className="p-4 bg-red-50 text-red-700 text-sm rounded-lg">
-    Missing client secret — step 3 reached but Stripe cannot initialize
-  </div>
-)}
-
-{step === 3 && clientSecret && !stripePromise && (
-  <div className="p-4 bg-red-50 text-red-700 text-sm rounded-lg">
-    Stripe failed to load
-  </div>
-)}
 
       {step === 3 && clientSecret && (
         <div className="bg-white rounded-xl border border-gray-100 p-6">
