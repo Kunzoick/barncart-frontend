@@ -10,6 +10,10 @@ import { Calendar, Clock, MapPin } from 'lucide-react'
 import ReservationTimer from '../components/checkout/ReservationTimer'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
+.catch(err => {
+  console.error('Stripe failed to load:', err)
+  return null
+})
 
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -74,6 +78,7 @@ export default function Checkout() {
   const [resumeChecking, setResumeChecking] = useState(true)
   const [reservationMade, setReservationMade] = useState(false)
   const [idempotencyKey] = useState(() => generateUUID())
+  const [stripeError, setStripeError] = useState(null)
 
   const submitting = useRef(false)
   const resumeHasRun = useRef(false)
@@ -430,6 +435,18 @@ export default function Checkout() {
           </div>
         </div>
       )}
+
+      {step === 3 && !clientSecret && (
+  <div className="p-4 bg-red-50 text-red-700 text-sm rounded-lg">
+    Missing client secret — step 3 reached but Stripe cannot initialize
+  </div>
+)}
+
+{step === 3 && clientSecret && !stripePromise && (
+  <div className="p-4 bg-red-50 text-red-700 text-sm rounded-lg">
+    Stripe failed to load
+  </div>
+)}
 
       {step === 3 && clientSecret && (
         <div className="bg-white rounded-xl border border-gray-100 p-6">
