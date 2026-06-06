@@ -8,7 +8,11 @@ export default function ReservationTimer({ expiresAt, onExpired }) {
     if (!expiresAt) return
 
     const calculateTimeLeft = () => {
-      const expiry = new Date(expiresAt)
+      // Append Z if not already present — backend returns LocalDateTime
+      // with no timezone suffix. Without Z, mobile Chrome interprets it
+      // as local time instead of UTC, making the expiry appear in the past.
+      const rawString = expiresAt.endsWith('Z') ? expiresAt : expiresAt + 'Z'
+      const expiry = new Date(rawString)
       const now = new Date()
       const diff = expiry - now
 
@@ -30,7 +34,7 @@ export default function ReservationTimer({ expiresAt, onExpired }) {
 
   if (!timeLeft) return null
 
-  const isUrgent = timeLeft.diff < 5 * 60 * 1000 // under 5 minutes
+  const isUrgent = timeLeft.diff < 5 * 60 * 1000
 
   return (
     <div className={`flex items-center justify-center gap-2 p-3 rounded-lg
