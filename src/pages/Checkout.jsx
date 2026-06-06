@@ -10,7 +10,6 @@ import { Calendar, Clock, MapPin } from 'lucide-react'
 import ReservationTimer from '../components/checkout/ReservationTimer'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
-let checkoutInitialized = false
 
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -75,39 +74,51 @@ export default function Checkout() {
   const [resumeChecking, setResumeChecking] = useState(true)
   const [reservationMade, setReservationMade] = useState(false)
   const [idempotencyKey] = useState(() => generateUUID())
+
   const submitting = useRef(false)
+  const resumeHasRun = useRef(false)
 
   const [address, setAddress] = useState({
     addressLine1: '', addressLine2: '', city: '',
     province: '', postalCode: '', country: 'CA', deliveryNotes: ''
   })
 
-  useEffect(() => {
-    checkoutInitialized = false
-    return () => { checkoutInitialized = false }
-  }, [])
-
-  useEffect(() => {
-    sessionStorage.setItem('mount_count',
-      String(Number(sessionStorage.getItem('mount_count') || 0) + 1))
-    return () => {
-      sessionStorage.setItem('checkout_debug',
-        'UNMOUNTED_mounts:' + sessionStorage.getItem('mount_count'))
-    }
-  }, [])
-
+  // Redirect if not logged in
   useEffect(() => {
     if (!authLoading && !user) navigate('/login')
   }, [user, authLoading])
 
+  // Resume existing reservation if one exists
   useEffect(() => {
+    // Auth still resolving — wait, effect will re-run when it flips
     if (authLoading) return
-    if (!user) { setResumeChecking(false); return }
-    if (checkoutInitialized) { setResumeChecking(false); return }
-    checkoutInitialized = true
+
+    // Auth resolved but no user — stop
+    if (!user) {
+      setResumeChecking(false)
+      return
+    }
+
+    // Checkout already in progress — don't interfere
+    if (submitting.current) {
+      setResumeChecking(false)
+      return
+    }
+
+    // Already ran — don't run again
+    if (resumeHasRun.current) {
+      setResumeChecking(false)
+      return
+    }
+
+    // Set the flag ONLY here — after all guards pass, before async work starts
+    resumeHasRun.current = true
 
     getOrders()
       .then(async res => {
+        // Checkout completed while getOrders was in-flight — don't overwrite
+        if (submitting.current) return
+
         const reserved = res.data.find(o => o.status === 'RESERVED')
         if (reserved && reserved.reservationExpiresAt) {
           const expiry = new Date(reserved.reservationExpiresAt)
@@ -117,27 +128,20 @@ export default function Checkout() {
               setClientSecret(secretRes.data.clientSecret)
               setReservationExpiresAt(reserved.reservationExpiresAt)
               setReservationMade(true)
-              setResumeChecking(false)
               setStep(3)
-            } catch (err) {
-              const status = err.response?.status
-              const msg = err.response?.data?.message || err.message || 'unknown'
-              sessionStorage.setItem('checkout_debug',
-                'getClientSecret_failed:' + status + ':' + msg)
+            } catch (_) {
+              // client secret fetch failed — user starts fresh from step 1
             }
-          } else {
-            sessionStorage.setItem('checkout_debug', 'reservation_expired')
           }
-        } else {
-          sessionStorage.setItem('checkout_debug', 'no_reserved_order_found')
         }
       })
-      .catch((err) => {
-        sessionStorage.setItem('checkout_debug', 'getOrders_failed:' + err.message)
+      .catch(() => {
+        // getOrders failed — user starts fresh from step 1
       })
       .finally(() => setResumeChecking(false))
   }, [user, authLoading])
 
+  // Load delivery slots
   useEffect(() => {
     const now = new Date()
     const currentHour = now.getHours()
@@ -171,24 +175,19 @@ export default function Checkout() {
     submitting.current = true
     setLoading(true)
     setPaymentError(null)
-    sessionStorage.setItem('checkout_debug', 'calling_backend')
     try {
       const res = await checkout({
-        idempotencyKey: idempotencyKey,
+        idempotencyKey,
         deliverySlotId: selectedSlot.id,
         ...address
       })
-      sessionStorage.setItem('checkout_debug',
-        'backend_success_cs:' + (res.data.clientSecret ? 'present' : 'missing'))
       setReservationMade(true)
       setClientSecret(res.data.clientSecret)
       setReservationExpiresAt(res.data.reservationExpiresAt)
-      setResumeChecking(false)
       setStep(3)
     } catch (err) {
       submitting.current = false
       const msg = err.response?.data?.message || err.message || ''
-      sessionStorage.setItem('checkout_debug', 'error:' + msg)
       if (msg.toLowerCase().includes('already exists')) {
         try {
           const orderRes = await getOrders()
@@ -198,7 +197,6 @@ export default function Checkout() {
             setClientSecret(secretRes.data.clientSecret)
             setReservationExpiresAt(reserved.reservationExpiresAt)
             setReservationMade(true)
-            setResumeChecking(false)
             setStep(3)
             return
           }
@@ -222,8 +220,6 @@ export default function Checkout() {
       ? item.bulkPrice : item.retailPrice
     return sum + price * item.quantity
   }, 0) || 0
-
-  sessionStorage.setItem('last_render_step', String(step))
 
   if (authLoading || resumeChecking) {
     return (
@@ -259,13 +255,6 @@ export default function Checkout() {
           </div>
         ))}
       </div>
-
-      {/* DEBUG — remove after fix */}
-      {sessionStorage.getItem('checkout_debug') && (
-        <div className="mb-4 p-2 bg-yellow-100 text-xs text-yellow-900 rounded break-all">
-          Debug: {sessionStorage.getItem('checkout_debug')} | mounts: {sessionStorage.getItem('mount_count')} | last_step: {sessionStorage.getItem('last_render_step')}
-        </div>
-      )}
 
       {step === 1 && (
         <div className="bg-white rounded-xl border border-gray-100 p-6">
@@ -463,7 +452,7 @@ export default function Checkout() {
                 setReservationExpiresAt(null)
                 setReservationMade(false)
                 submitting.current = false
-                checkoutInitialized = false
+                resumeHasRun.current = false
               }}
             />
           </div>
