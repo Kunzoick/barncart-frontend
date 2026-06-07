@@ -2,13 +2,13 @@ import { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { verifyEmail, resendVerification } from '../api/auth'
+import { Mail, ArrowRight } from 'lucide-react'
 
 export default function VerifyEmail() {
   const { login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Email passed from Register page via navigate state
   const [email, setEmail] = useState(location.state?.email || '')
   const [code, setCode] = useState('')
   const [error, setError] = useState(null)
@@ -49,19 +49,30 @@ export default function VerifyEmail() {
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+      <div className="w-full max-w-md bg-white rounded-xl shadow-sm border
+        border-gray-100 p-8">
 
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-farm-text mb-1">Verify your email</h1>
+        <div className="mb-6 text-center">
+          <div className="w-12 h-12 bg-farm-greenMuted rounded-full flex items-center
+            justify-center mx-auto mb-4">
+            <Mail className="w-6 h-6 text-farm-green" />
+          </div>
+          <h1 className="text-2xl font-bold text-farm-text mb-1">Check your email</h1>
           <p className="text-sm text-gray-500">
             We sent a 6-digit code to{' '}
             <span className="font-medium text-farm-text">{email || 'your email'}</span>
-            . You can also skip this and log in directly as we are limited to some features with Resend.
           </p>
         </div>
 
-        {/* Error */}
+        {/* Demo notice — prominent */}
+        <div className="mb-5 px-4 py-3 bg-amber-50 border border-amber-200
+          rounded-lg text-sm text-amber-700">
+          <p className="font-medium mb-0.5">Demo mode — email delivery limited</p>
+          <p className="text-xs">
+            Email verification is optional. You can skip this step and log in directly.
+          </p>
+        </div>
+
         {error && (
           <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg
             text-sm text-red-700">
@@ -69,7 +80,6 @@ export default function VerifyEmail() {
           </div>
         )}
 
-        {/* Success */}
         {success && (
           <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg
             text-sm text-green-700">
@@ -78,7 +88,6 @@ export default function VerifyEmail() {
         )}
 
         <form onSubmit={handleVerify} className="flex flex-col gap-4">
-          {/* Show email input if not passed from Register */}
           {!location.state?.email && (
             <div>
               <label className="block text-sm font-medium text-farm-text mb-1">
@@ -91,8 +100,8 @@ export default function VerifyEmail() {
                 required
                 placeholder="you@example.com"
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm
-                  focus:outline-none focus:ring-2 focus:ring-farm-green focus:border-transparent
-                  placeholder:text-gray-400"
+                  focus:outline-none focus:ring-2 focus:ring-farm-green
+                  focus:border-transparent placeholder:text-gray-400"
               />
             </div>
           )}
@@ -110,9 +119,9 @@ export default function VerifyEmail() {
               maxLength={6}
               className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm
                 tracking-widest text-center font-mono text-lg
-                focus:outline-none focus:ring-2 focus:ring-farm-green focus:border-transparent
-                placeholder:text-gray-400 placeholder:tracking-normal placeholder:font-sans
-                placeholder:text-base"
+                focus:outline-none focus:ring-2 focus:ring-farm-green
+                focus:border-transparent placeholder:text-gray-400
+                placeholder:tracking-normal placeholder:font-sans placeholder:text-base"
             />
             <p className="text-xs text-gray-400 mt-1">Code expires in 15 minutes</p>
           </div>
@@ -128,8 +137,8 @@ export default function VerifyEmail() {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-500 mb-2">Didn't receive a code?</p>
+        <div className="mt-4 text-center">
+          <p className="text-sm text-gray-500 mb-1">Didn't receive a code?</p>
           <button
             onClick={handleResend}
             disabled={resending || !email}
@@ -140,20 +149,20 @@ export default function VerifyEmail() {
           </button>
         </div>
 
-        <p className="mt-4 text-center text-sm text-gray-500">
-          <Link to="/login" className="text-farm-green font-medium hover:underline">
-            Back to Login
-          </Link>
-        </p>
-         {/* Skip verification */}
-        <div className="mt-3 text-center">
-          <p className="text-xs text-gray-400 mb-1">Email verification is optional</p>
+        {/* Skip — prominent, above back to login */}
+        <div className="mt-5 pt-5 border-t border-gray-100">
           <Link
             to="/login"
-            className="text-sm text-gray-500 hover:text-farm-green hover:underline"
+            className="w-full flex items-center justify-center gap-2 py-2.5
+              border border-gray-200 rounded-lg text-sm font-medium text-gray-600
+              hover:border-farm-green hover:text-farm-green transition-colors"
           >
-            Skip for now — go to Login
+            Skip verification — go to Login
+            <ArrowRight className="w-4 h-4" />
           </Link>
+          <p className="text-xs text-gray-400 text-center mt-2">
+            You can verify your email later from your account settings
+          </p>
         </div>
 
       </div>

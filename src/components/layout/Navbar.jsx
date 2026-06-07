@@ -46,7 +46,9 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-3 text-sm">
             {authLoading ? null : user ? (
               <>
-                <span className="text-farm-greenMuted">Hello, {user.firstName}</span>
+                <Link to="/account" className="hover:text-farm-amber transition-colors">
+                Hello, {user.firstName}
+                </Link>
                 <Link to="/orders" className="hover:text-farm-amber transition-colors">Orders</Link>
                 <button onClick={handleLogout}
                   className="bg-farm-amber text-farm-text px-3 py-1.5 rounded-md
@@ -79,9 +81,11 @@ export default function Navbar() {
             className="hover:text-farm-amber transition-colors">Shop</Link>
           {authLoading ? null : user ? (
             <>
-              <span className="text-farm-greenMuted">Hello, {user.firstName}</span>
-              <Link to="/orders" onClick={() => setMenuOpen(false)}
-                className="hover:text-farm-amber transition-colors">Orders</Link>
+              <Link to="/account" onClick={() => setMenuOpen(false)}
+                className="hover:text-farm-amber transition-colors">Hello, {user.firstName}
+                </Link>
+                <Link to="/orders" onClick={() => setMenuOpen(false)}
+                 className="hover:text-farm-amber transition-colors">Orders</Link>
               {user.role === 'ADMIN' && (
                 <Link to="/admin" onClick={() => setMenuOpen(false)}
                   className="hover:text-farm-amber transition-colors">Admin</Link>

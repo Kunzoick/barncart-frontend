@@ -23,6 +23,7 @@ import AdminProduce from './pages/admin/AdminProduce'
 import AdminAnalytics from './pages/admin/AdminAnalytics'
 import RequireAdmin from './components/auth/RequireAdmin'
 import Home from './pages/Home'
+import Account from './pages/Account'
 
 function CustomerShell({ children }) {
   return (
@@ -63,6 +64,7 @@ function App() {
         <Route path="/order-confirmation" element={<CustomerShell><OrderConfirmation /></CustomerShell>} />
         <Route path="/orders" element={<CustomerShell><Orders /></CustomerShell>} />
         <Route path="/orders/:orderId" element={<CustomerShell><OrderDetail /></CustomerShell>} />
+        <Route path="/account" element={<CustomerShell><Account /></CustomerShell>} />
       </Routes>
     </BrowserRouter>
   )

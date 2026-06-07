@@ -65,6 +65,12 @@ export default function ForgotPassword() {
           </div>
         )}
 
+        <div className="mb-4 px-4 py-3 bg-yellow-50 border border-yellow-200
+  rounded-lg text-sm text-yellow-700">
+  Email delivery is currently in test mode. For demo purposes, use the
+  Change Password option from your account settings if you are logged in.
+</div>
+
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
             <label className="block text-sm font-medium text-farm-text mb-1">

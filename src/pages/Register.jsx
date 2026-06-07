@@ -148,6 +148,12 @@ export default function Register() {
             <p className="text-xs text-gray-400 mt-1">Maximum 72 characters</p>
           </div>
 
+          <div className="px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg
+            text-xs text-amber-700">
+            After registering you'll be asked to verify your email. Email delivery
+            is currently limited — you can skip verification and log in directly.
+          </div>
+
           <button
             type="submit"
             disabled={loading}
