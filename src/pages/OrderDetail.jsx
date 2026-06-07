@@ -217,7 +217,7 @@ export default function OrderDetail() {
             I Have a Problem With My Order
           </button>
           <p className="text-xs text-gray-400 text-center">
-            If you don't confirm within 24 hours, it will be confirmed automatically.
+            If you don't confirm within 48 hours, it will be confirmed automatically and marked as delivered.
           </p>
         </div>
       )}

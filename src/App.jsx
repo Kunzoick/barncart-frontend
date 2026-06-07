@@ -24,11 +24,13 @@ import AdminAnalytics from './pages/admin/AdminAnalytics'
 import RequireAdmin from './components/auth/RequireAdmin'
 import Home from './pages/Home'
 import Account from './pages/Account'
+import FulfilledOrderBanner from './components/order/FulfilledOrderBanner'
 
 function CustomerShell({ children }) {
   return (
     <div className="min-h-screen flex flex-col bg-farm-bg">
       <Navbar />
+       <FulfilledOrderBanner />
       <main className="flex-1">{children}</main>
       <Footer />
     </div>
