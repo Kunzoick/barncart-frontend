@@ -449,6 +449,14 @@ export default function Checkout() {
             />
           </div>
 
+          {/* Demo banner — remove in production */}
+<div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+  <p className="text-xs text-blue-700 font-medium mb-1">Test Mode</p>
+  <p className="text-xs text-blue-600">
+    Use card <strong>4242 4242 4242 4242</strong>, any future expiry, any 3-digit CVC.
+  </p>
+</div>
+
           <Elements stripe={stripePromise} options={{
             clientSecret,
             appearance: { theme: 'stripe', variables: { colorPrimary: '#2D6A4F' } }

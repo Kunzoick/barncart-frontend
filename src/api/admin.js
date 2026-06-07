@@ -10,6 +10,7 @@ export const resolveDispute = (orderId) => api.post(`/api/admin/orders/${orderId
 export const getAdminBatches = () => api.get('/api/admin/batches')
 export const createBatch = (data) => api.post('/api/admin/batches', data)
 export const cancelBatch = (batchId) => api.patch(`/api/admin/batches/${batchId}/cancel`)
+export const restockBatch = (batchId, quantity) => api.patch(`/api/admin/batches/${batchId}/restock`, { quantity })
 
 // Listings
 export const getAdminListings = () => api.get('/api/listings')
@@ -36,3 +37,4 @@ export const updateCategory = (id, data) => api.put(`/api/admin/categories/${id}
 // Delivery slots
 export const getAdminSlots = (from, to) => api.get(`/api/delivery-slots/admin?from=${from}&to=${to}`)
 export const createSlot = (data) => api.post('/api/delivery-slots', data)
+
