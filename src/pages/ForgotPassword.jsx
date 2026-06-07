@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { forgotPassword } from '../api/auth'
+import { MailX } from 'lucide-react'
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
@@ -32,12 +33,21 @@ export default function ForgotPassword() {
             justify-center mx-auto mb-4">
             <span className="text-farm-green text-xl">✓</span>
           </div>
-          <h1 className="text-2xl font-bold text-farm-text mb-2">Check your email</h1>
-          <p className="text-sm text-gray-500 mb-6">
+          <h1 className="text-2xl font-bold text-farm-text mb-2">Request submitted</h1>
+          <p className="text-sm text-gray-500 mb-4">
             If an account exists for{' '}
             <span className="font-medium text-farm-text">{email}</span>,
-            you will receive a reset link shortly.
+            a reset link will be sent shortly.
           </p>
+          <div className="px-4 py-3 bg-yellow-50 border border-yellow-200
+            rounded-lg text-xs text-yellow-700 text-left mb-6">
+            <p className="font-semibold mb-0.5">Demo environment notice</p>
+            <p>
+              Email delivery is limited in this demo. If you don't receive the
+              email, please contact the site administrator directly to reset
+              your password.
+            </p>
+          </div>
           <Link to="/login"
             className="text-sm text-farm-green font-medium hover:underline">
             Back to Login
@@ -51,10 +61,22 @@ export default function ForgotPassword() {
     <div className="min-h-[80vh] flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white rounded-xl shadow-sm border
         border-gray-100 p-8">
-        <div className="mb-8 text-center">
+
+        <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold text-farm-text mb-1">Forgot password?</h1>
           <p className="text-sm text-gray-500">
             Enter your email and we'll send you a reset link
+          </p>
+        </div>
+
+        {/* Demo warning — honest but not blocking */}
+        <div className="mb-5 px-4 py-3 bg-yellow-50 border border-yellow-200
+          rounded-lg text-xs text-yellow-700">
+          <p className="font-semibold mb-0.5">Demo environment notice</p>
+          <p>
+            Email delivery is currently limited. Your reset request will be
+            processed but the email may not arrive. If it doesn't, contact
+            the administrator for manual assistance.
           </p>
         </div>
 
@@ -64,12 +86,6 @@ export default function ForgotPassword() {
             {error}
           </div>
         )}
-
-        <div className="mb-4 px-4 py-3 bg-yellow-50 border border-yellow-200
-  rounded-lg text-sm text-yellow-700">
-  Email delivery is currently in test mode. For demo purposes, use the
-  Change Password option from your account settings if you are logged in.
-</div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
