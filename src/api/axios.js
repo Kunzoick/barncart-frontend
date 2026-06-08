@@ -30,7 +30,8 @@ api.interceptors.response.use(
     const original = error.config
     //skip retry for auth endpoints
     const isAuthEndpoint = original.url?.includes('/api/auth/')
-    if (error.response?.status === 401 && !original._retry && !isAuthEndpoint) {
+    if ((error.response?.status === 401 || error.response?.status === 403)
+      && !original._retry && !isAuthEndpoint) {
       original._retry = true
       if (authRefreshFn) {
         const newToken = await authRefreshFn()
